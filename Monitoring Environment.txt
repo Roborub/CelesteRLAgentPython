@@ -1,0 +1,7 @@
+Live reward logging: 
+tensorboard --logdir ./celeste_tensorboard/
+
+Optimisation trial logging:
+Optuna-Dashboard sqlite:///celeste_reward_optimization_v1.9.db
+
+(replace ./celeste_tensorboard/ with tensorboard logging directory and celeste_reward_optimization_v1.9.db with your Optuna db name)
