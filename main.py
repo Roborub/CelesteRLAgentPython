@@ -1,52 +1,65 @@
 import time
-import optuna
 import subprocess
 import os
 import torch
 
-from reward_optimizer import objective
-from config import ModelConfig, OptunaConfig, EnvironmentConfig, CustomRewardWeights
+from config import (
+    ModelConfig,
+    EnvironmentConfig,
+    CustomRewardWeights,
+)
 
+from reward_optimizer import train_curriculum   # NEW: curriculum trainer
+
+
+# ---------------------------------------------------------
+# Kill all Celeste instances before starting
+# ---------------------------------------------------------
 def global_cleanup():
     print("--- Performing Global Cleanup ---")
     if os.name == 'nt':
         try:
-            subprocess.run(['taskkill', '/F', '/IM', 'Celeste.exe', '/T'], 
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ['taskkill', '/F', '/IM', 'Celeste.exe', '/T'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
             print("Cleanup: All previous Celeste instances terminated.")
         except Exception as e:
             print(f"Cleanup Note: {e}")
     time.sleep(2.0)
 
+
+# ---------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------
 def main():
     global_cleanup()
     torch.set_num_threads(1)
 
-    study_name = f"celeste_reward_optimization_v{ModelConfig.VERSION}"
-    storage_name = f"sqlite:///{study_name}.db"
+    print(f"=== CELESTE CURRICULUM TRAINER v{ModelConfig.VERSION} ===")
 
-    study = optuna.create_study(
-        study_name=study_name,
-        storage=storage_name,
-        direction="maximize",
-        load_if_exists=True
-    )
-
-    if EnvironmentConfig.RunFinalModel:
-        print(f"--- Running Final Model with Best Params from {study_name} ---")
-        trial = optuna.trial.FixedTrial(study.best_params)
-        objective(trial)
-
-    elif EnvironmentConfig.UseCustomWeights:
-        print(f"--- Enqueuing Custom Weights for Trial #1 ---")
-        study.enqueue_trial(CustomRewardWeights)
-        study.optimize(objective, n_trials=OptunaConfig.TRIALS)
-
+    # Choose reward weights
+    if EnvironmentConfig.UseCustomWeights:
+        reward_weights = CustomRewardWeights
+        print("--- Using Custom Reward Weights ---")
     else:
-        try:
-            study.optimize(objective, n_trials=OptunaConfig.TRIALS)
-        except KeyboardInterrupt:
-            print("Optimization interrupted by user.")
+        raise RuntimeError(
+            "Optuna-based reward tuning is no longer supported in curriculum mode. "
+            "Set UseCustomWeights=True in config."
+        )
+
+    # Run curriculum training
+    final_actor_state = train_curriculum(reward_weights)
+
+    # Save final actor
+    os.makedirs("models", exist_ok=True)
+    final_path = f"models/celeste_curriculum_final_actor_v{ModelConfig.VERSION}.pth"
+    torch.save(final_actor_state, final_path)
+
+    print(f"\n=== TRAINING COMPLETE ===")
+    print(f"Final actor saved to: {final_path}")
+
 
 if __name__ == "__main__":
     main()

@@ -41,7 +41,16 @@ class ObsIndex:
 class RewardConfig:
     LEAP_THRESHOLD = 8.0
     TILE_SIZE = 8
-    SPAWN_POSITION_THRESHOLD = 16.0 
+    SPAWN_POSITION_THRESHOLD = 16.0
+
+class LevelConfig:
+    LEVEL_ID_MAP = {
+        1: "1",
+        2: "2",
+        3: "3",
+        4: "4",
+        5: "3b"
+    }
 
 class EnvironmentConfig:
     Policy = "MultiInputPolicy"
